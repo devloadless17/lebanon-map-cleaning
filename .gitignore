@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+.next/
+coverage/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+generated/
+.DS_Store
+*.log
+
+# Browser-automation scratch output
+.playwright-cli/

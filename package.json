@@ -1,0 +1,39 @@
+{
+  "name": "lebanon-cleaning",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build --workspace @lebanon/contracts && concurrently -k -n contracts,api,web -c gray,cyan,magenta \"npm:dev:contracts\" \"npm:dev:api\" \"npm:dev:web\"",
+    "build": "npm run build --workspace @lebanon/contracts && npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run db:migrate --workspace @lebanon/api",
+    "db:seed": "npm run db:seed --workspace @lebanon/api",
+    "db:studio": "npm run db:studio --workspace @lebanon/api",
+    "dev:contracts": "npm run dev --workspace @lebanon/contracts",
+    "dev:api": "npm run dev --workspace @lebanon/api",
+    "dev:web": "npm run dev --workspace @lebanon/web",
+    "check:google": "npm run check:google --workspace @lebanon/api",
+    "cache:clear": "npm run cache:clear --workspace @lebanon/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "dotenv-cli": "^11.0.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  },
+  "allowScripts": {
+    "prisma@7.10.0": true,
+    "@prisma/engines@7.10.0": true,
+    "esbuild@0.28.2": true,
+    "@swc/core@1.16.2": true
+  }
+}

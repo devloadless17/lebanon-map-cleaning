@@ -1,0 +1,26 @@
+# Local development: Postgres in Docker, the apps on the host via `npm run dev`.
+# Node stays on the host so hot reload is instant; production uses docker-compose.prod.yml.
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: lebanon
+      POSTGRES_PASSWORD: lebanon
+      POSTGRES_DB: lebanon_cleaning
+    ports:
+      # Bound to loopback ONLY. Docker writes its own iptables rules and bypasses UFW, so a
+      # bare "5432:5432" would publish the database to the whole internet.
+      - '127.0.0.1:5433:5432'
+    volumes:
+      # Postgres 18+ wants the mount one level UP from the old convention: it places data in a
+      # version-specific subdirectory so that pg_upgrade --link can work across a major bump.
+      # Mounting /var/lib/postgresql/data directly makes an 18 image refuse to start.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lebanon -d lebanon_cleaning']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

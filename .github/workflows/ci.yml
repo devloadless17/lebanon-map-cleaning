@@ -1,0 +1,215 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, production]
+  workflow_dispatch:
+
+concurrency:
+  # Never cancel a deploy mid-SSH: that orphans containers on the server.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/production' }}
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: lebanon
+          POSTGRES_PASSWORD: lebanon
+          POSTGRES_DB: lebanon_cleaning_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U lebanon" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://lebanon:lebanon@localhost:5432/lebanon_cleaning_test?schema=public
+      SESSION_SECRET: ci-only-secret-ci-only-secret-ci-only-secret
+      FRONTEND_ORIGIN: http://localhost:4101
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm i -g npm@11
+      - run: npm ci
+      - run: npm run build --workspace @lebanon/contracts
+      - run: npm run db:deploy --workspace @lebanon/api
+      - run: npm run typecheck
+      # The scheduling engine is pure, so these run with no database and no network.
+      - run: npm run test
+      - run: npm run build --workspace @lebanon/api
+      - name: Build web
+        run: npm run build --workspace @lebanon/web
+      # --omit=dev: a dev-only advisory must never block a production hotfix.
+      - run: npm audit --omit=dev --audit-level=critical
+        continue-on-error: true
+
+  deploy:
+    name: Deploy to VPS
+    # Nothing ships unless the checks passed.
+    needs: verify
+    if: github.ref == 'refs/heads/production' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          REQUIRED: >-
+            DOCKER_USERNAME DOCKER_SECRET VPS_HOST VPS_USER VPS_SSH_KEY_B64
+            API_DOMAIN FRONTEND_DOMAIN ACME_EMAIL POSTGRES_PASSWORD SESSION_SECRET
+        run: |
+          missing=""
+          for name in $REQUIRED; do
+            value=$(jq -r --arg k "$name" '.[$k] // empty' <<< '${{ toJSON(secrets) }}')
+            [ -z "$value" ] && missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            exit 1
+          fi
+          echo "All required secrets present."
+
+      - name: Prepare SSH key
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo '${{ secrets.VPS_SSH_KEY_B64 }}' | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Fail loudly here rather than as a confusing SSH error three steps later.
+          head -1 ~/.ssh/deploy_key | grep -q "BEGIN OPENSSH PRIVATE KEY" \
+            || { echo "::error::VPS_SSH_KEY_B64 did not decode to an OpenSSH private key"; exit 1; }
+
+      - name: Wait for the server to accept connections
+        run: |
+          # Hostinger's edge DDoS scrubbing intermittently drops GitHub runner IPs; a rerun
+          # draws a fresh IP, so retry before giving up.
+          for attempt in $(seq 1 7); do
+            if nc -z -w 5 '${{ secrets.VPS_HOST }}' '${{ secrets.VPS_PORT || 22 }}'; then
+              echo "Reachable on attempt $attempt"; exit 0
+            fi
+            echo "Attempt $attempt: not reachable, retrying in 8s"; sleep 8
+          done
+          echo "::error::Server never became reachable"; exit 1
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_SECRET }}
+
+      - name: Build and push the API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/lebanon-cleaning-api:latest
+            ${{ secrets.DOCKER_USERNAME }}/lebanon-cleaning-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          # NEXT_PUBLIC_* are inlined at build time, so they must be build args.
+          build-args: |
+            NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY }}
+            NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/lebanon-cleaning-web:latest
+            ${{ secrets.DOCKER_USERNAME }}/lebanon-cleaning-web:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Render .env on the runner
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          GOOGLE_MAPS_SERVER_KEY: ${{ secrets.GOOGLE_MAPS_SERVER_KEY }}
+        shell: bash
+        run: |
+          # Never sed a template. Compose's env parser hard-fails on bare < or spaces and
+          # EXPANDS $VAR in unquoted values, silently truncating passwords.
+          #
+          # Single quotes are literal but have NO escape mechanism, so a value containing one
+          # has to switch to double quotes, where \ " and $ each need escaping. Verified against
+          # compose itself with quotes, dollars, backslashes and trailing spaces.
+          put() {
+            local key=$1 value=$2
+            if [[ "$value" == *"'"* ]]; then
+              value=${value//\\/\\\\}; value=${value//\"/\\\"}; value=${value//$/\\$}
+              printf '%s="%s"\n' "$key" "$value"
+            else
+              printf "%s='%s'\n" "$key" "$value"
+            fi
+          }
+          {
+            put DOCKER_USERNAME '${{ secrets.DOCKER_USERNAME }}'
+            put IMAGE_TAG       '${{ github.sha }}'
+            put API_DOMAIN      '${{ secrets.API_DOMAIN }}'
+            put FRONTEND_DOMAIN '${{ secrets.FRONTEND_DOMAIN }}'
+            put ACME_EMAIL      '${{ secrets.ACME_EMAIL }}'
+            put POSTGRES_USER   'lebanon'
+            put POSTGRES_DB     'lebanon_cleaning'
+            put POSTGRES_PASSWORD "$POSTGRES_PASSWORD"
+            put SESSION_SECRET  "$SESSION_SECRET"
+            put GOOGLE_MAPS_SERVER_KEY "$GOOGLE_MAPS_SERVER_KEY"
+            put NODE_ENV        'production'
+            put FRONTEND_ORIGIN "https://${{ secrets.FRONTEND_DOMAIN }}"
+            put TRUSTED_PROXY_HOPS '1'
+          } > .env.deploy
+
+      - name: Ship files to the server
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p ${{ secrets.VPS_PORT || 22 }}"
+          TARGET='${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}'
+          ssh $SSH_OPTS "$TARGET" 'mkdir -p ~/lebanon-cleaning' </dev/null
+          scp $SSH_OPTS infra/docker-compose.prod.yml "$TARGET:~/lebanon-cleaning/docker-compose.yml"
+          scp $SSH_OPTS infra/Caddyfile "$TARGET:~/lebanon-cleaning/Caddyfile"
+          scp $SSH_OPTS .env.deploy "$TARGET:~/lebanon-cleaning/.env"
+
+      - name: Migrate, start, and health-gate
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=accept-new -p ${{ secrets.VPS_PORT || 22 }}"
+          TARGET='${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}'
+          ssh $SSH_OPTS "$TARGET" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd ~/lebanon-cleaning
+          chmod 600 .env
+
+          docker compose pull
+          docker compose up -d postgres
+          # Migrations run from the image so they use prod dependencies only.
+          # Every `exec` ends with </dev/null: exec drains stdin and would otherwise swallow the
+          # rest of this piped script.
+          docker compose run --rm -w /app/apps/api api npx prisma migrate deploy </dev/null
+          docker compose up -d
+
+          echo "Waiting for services to become healthy..."
+          for attempt in $(seq 1 30); do
+            api=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q api)" 2>/dev/null || echo starting)
+            web=$(docker inspect --format='{{.State.Health.Status}}' "$(docker compose ps -q web)" 2>/dev/null || echo starting)
+            if [ "$api" = healthy ] && [ "$web" = healthy ]; then
+              echo "Both services healthy."; docker compose ps; exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::error::Services did not become healthy in time"
+          docker compose logs --tail 80
+          exit 1
+          REMOTE
