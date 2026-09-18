@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "dotenv -e ../../.env -- next dev -p 4101",
-    "build": "next build",
-    "start": "next start -p 4101",
+    "build": "dotenv -e ../../.env -- next build",
+    "start": "dotenv -e ../../.env -- next start -p 4101",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
