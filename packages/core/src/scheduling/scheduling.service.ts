@@ -6,6 +6,7 @@ import type {
 } from '@lebanon/contracts';
 import { DaySimulator } from '../engine/DaySimulator';
 import { InsertionScanner } from '../engine/InsertionScanner';
+import { describeChosenTime } from '../engine/RouteFeedback';
 import type { ProposedStop, ScheduledStop } from '../engine/types';
 import { DayRepository } from './day.repository';
 import { TravelMatrixBuilder } from './travel-matrix.builder';
@@ -82,7 +83,7 @@ export class SchedulingService {
 
     const proposal: ProposedStop = {
       coordinate: request.proposal.coordinate,
-      label: 'New appointment',
+      label: 'this booking', // reads naturally inside a violation sentence
       windowStart: request.proposal.windowStart,
       windowEnd: request.proposal.windowEnd,
       serviceDurationMinutes: request.proposal.serviceDurationMinutes,
@@ -118,7 +119,17 @@ export class SchedulingService {
       bands: scan.bands,
       bandsRequiringMove: scan.bandsRequiringMove,
       timeline,
-      feedback: chosenBand?.feedback ?? [],
+      feedback:
+        chosenBand?.feedback ??
+        (chosen === undefined
+          ? []
+          : describeChosenTime({
+              baseline: scan.baseline,
+              withProposal: timeline,
+              proposal,
+              chosen,
+              workdayEnd: context.workdayEnd,
+            })),
     };
   }
 

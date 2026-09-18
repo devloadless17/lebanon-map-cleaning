@@ -1,13 +1,13 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, Field, Input } from '@/components/ui/primitives';
 import { TimeInput } from '@/components/ui/TimeInput';
 import { api } from '@/lib/api/client';
 import { beirutMinutesNow, beirutToday, formatClock, parseClock } from '@/lib/time';
 import { LocationPicker } from './LocationPicker';
-import { TimeBands } from './TimeBands';
+import { RouteVerdict } from './RouteVerdict';
 import { bookLabel, isSavable, type ReservationDraft } from './draft';
 import { useRoutePreview } from './useRoutePreview';
 
@@ -74,6 +74,7 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
 
       if (draft.appointmentId) {
         return api.patch(`/appointments/${draft.appointmentId}`, {
+          force: true,
           promisedStart: draft.promisedStart,
           windowStart: draft.windowStart,
           windowEnd: draft.windowEnd,
@@ -83,6 +84,8 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
       }
 
       return api.post('/appointments', {
+        // The team picked this time knowing what it costs; the engine advises, it does not veto.
+        force: true,
         customerId,
         locationId,
         date: draft.date,
@@ -118,22 +121,7 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
       setSaveError(error instanceof Error ? error.message : 'Could not update that appointment.'),
   });
 
-  const bands = preview.data?.bands ?? [];
   const dayBroken = preview.data ? !preview.data.dayHealth.feasible : false;
-
-  // Preselect the best slot once the options arrive.
-  //
-  // Leaving nothing chosen meant the primary button read "Pick a time" while a perfectly good
-  // slot sat immediately above it — an extra click for no decision, and a dead-looking button
-  // for anyone exploring on their own. The system proposes; the scheduler can still take a
-  // different band or type any time at all.
-  const best = bands[0];
-  useEffect(() => {
-    if (draft.promisedStart === null && best) {
-      onChange({ promisedStart: best.recommended });
-      setManualTime(formatClock(best.recommended));
-    }
-  }, [best, draft.promisedStart, onChange]);
 
   return (
     <div className="animate-in flex h-full flex-col bg-surface">
@@ -206,53 +194,36 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
         </div>
 
         <section className="space-y-2">
-          <h3 className="text-xs font-medium tracking-wide text-ink-soft uppercase">
-            When can we come?
-          </h3>
+          <h3 className="text-xs font-medium tracking-wide text-ink-soft uppercase">What time?</h3>
 
           {draft.latitude === null ? (
             <p className="rounded-lg border border-dashed border-line-strong px-3 py-4 text-center text-xs text-ink-muted">
-              Set a location to see which times work.
+              Set a location first.
             </p>
           ) : (
-            <TimeBands
-              bands={bands}
-              bandsRequiringMove={preview.data?.bandsRequiringMove ?? []}
-              windowPassed={draft.date === beirutToday() && draft.windowEnd <= beirutMinutesNow()}
-              windowStart={draft.windowStart}
-              windowEnd={draft.windowEnd}
-              selected={draft.promisedStart}
-              loading={preview.isFetching && !preview.data}
-              onPick={(minutes) => {
-                onChange({ promisedStart: minutes });
-                setManualTime(formatClock(minutes));
-              }}
-            />
-          )}
+            <>
+              {/* The team decides the time. This only tells them what it costs — a tight day is
+                  theirs to accept, and nothing here refuses a booking. */}
+              <Field label="Start at">
+                <Input
+                  value={manualTime}
+                  placeholder="4:15 PM"
+                  onChange={(event) => setManualTime(event.target.value)}
+                  onBlur={() => {
+                    const minutes = parseClock(manualTime);
+                    if (minutes !== null) onChange({ promisedStart: minutes });
+                  }}
+                />
+              </Field>
 
-          {/* The system proposes; the scheduler disposes. An override is evaluated and
-              explained, never silently blocked. */}
-          <div className="flex items-end gap-2 border-t border-line pt-3">
-            <Field label="Or enter any time">
-              <Input
-                value={manualTime}
-                placeholder="4:15 PM"
-                onChange={(event) => setManualTime(event.target.value)}
-                onBlur={() => {
-                  const minutes = parseClock(manualTime);
-                  if (minutes !== null) onChange({ promisedStart: minutes });
-                }}
+              <RouteVerdict
+                chosen={draft.promisedStart}
+                feedback={preview.data?.feedback ?? []}
+                timeline={preview.data?.timeline ?? null}
+                loading={preview.isFetching}
               />
-            </Field>
-          </div>
-
-          {draft.promisedStart !== null && bands.length > 0 &&
-          !bands.some((b) => draft.promisedStart! >= b.earliest && draft.promisedStart! <= b.latest) ? (
-            <p className="rounded-md bg-warn-soft px-2.5 py-1.5 text-xs text-warn">
-              {formatClock(draft.promisedStart)} is outside every workable range. Saving will be
-              refused unless the route genuinely allows it.
-            </p>
-          ) : null}
+            </>
+          )}
         </section>
 
         {saveError ? (
