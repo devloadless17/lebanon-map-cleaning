@@ -57,7 +57,7 @@ export class DaySimulator {
           departure: context.workdayStart,
           returnTime: context.workdayStart,
         },
-        violations,
+        violations: violations.map(asSentence),
         estimated: input.estimated ?? false,
       };
     }
@@ -198,7 +198,7 @@ export class DaySimulator {
         departure,
         returnTime,
       },
-      violations,
+      violations: violations.map(asSentence),
       estimated: input.estimated ?? false,
     };
   }
@@ -250,3 +250,14 @@ export class DaySimulator {
 }
 
 export { formatClock };
+
+
+/**
+ * Messages are assembled from stop labels, and a label can begin in lower case — a proposal not
+ * yet saved is "this booking", which reads as a typo at the head of a sentence.
+ */
+function asSentence(violation: Violation): Violation {
+  const { message } = violation;
+  if (!message) return violation;
+  return { ...violation, message: message.charAt(0).toUpperCase() + message.slice(1) };
+}
