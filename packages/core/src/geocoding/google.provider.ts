@@ -15,6 +15,17 @@ export class GoogleGeocodingProvider implements GeocodingProvider {
   async forward(query: string): Promise<ResolvedPlace | null> {
     // Biased to Lebanon: an unqualified "Tripoli" should not land in Libya.
     const response = await this.request({ address: query, components: 'country:LB' });
+    const result = response.results?.[0];
+
+    /*
+     * The bias has a sharp edge. Ask for "Damascus", "Paris" or a typo and Google does not say it
+     * found nothing — it falls back to the country and returns "Lebanon" itself, a point in the
+     * middle of the Beqaa. Accepting that would put a customer at a plausible-looking pin nobody
+     * chose, and the scheduler would plan a real day's driving around it. Treat it as no result,
+     * which lets the caller fall through to our own locality list and then say so plainly.
+     */
+    if (!result || isCountryLevel(result) || !withinLebanon(result)) return null;
+
     return this.firstPlace(response);
   }
 
@@ -81,9 +92,31 @@ function mapPrecision(result: GeocodeResult): LocationPrecision {
   if (type === 'RANGE_INTERPOLATED' || type === 'GEOMETRIC_CENTER') return 'LANDMARK';
 
   const types = result.types ?? [];
-  if (types.includes('locality') || types.includes('administrative_area_level_1')) return 'LOCALITY';
   if (types.includes('sublocality') || types.includes('neighborhood')) return 'SUBLOCALITY';
-  return 'SUBLOCALITY';
+
+  /*
+   * Districts and governorates ("Western Beqaa District") are coarser than a town, not finer, so
+   * they take the widest circle we have. They used to fall through to SUBLOCALITY and claim 800m
+   * of accuracy for an area tens of kilometres across.
+   */
+  if (types.includes('locality') || types.some((t) => t.startsWith('administrative_area_level_'))) {
+    return 'LOCALITY';
+  }
+
+  // Unrecognised shapes claim the least, never the most: a wide circle invites a corrective pin.
+  return 'LOCALITY';
+}
+
+/** Google returning the country itself means it matched nothing inside it. */
+function isCountryLevel(result: GeocodeResult): boolean {
+  return (result.types ?? []).includes('country');
+}
+
+/** Lebanon's bounding box, with a margin. Catches a result the country bias failed to contain. */
+function withinLebanon(result: GeocodeResult): boolean {
+  const at = result.geometry?.location;
+  if (!at) return false;
+  return at.lat >= 33.0 && at.lat <= 34.75 && at.lng >= 35.0 && at.lng <= 36.7;
 }
 
 interface GeocodeResponse {
