@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnv } from 'dotenv';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { makeAdapter } from '../src/pg-config';
 import { hashPassword } from '../src/password';
 import { DEFAULT_DEPOT, PLANNING_AREAS } from './lebanon-geography';
 import { resetDemoData } from '../src/demo-data';
@@ -11,7 +11,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.resolve(here, '../../../.env'), quiet: true });
 
 const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: process.env['DATABASE_URL'] ?? '' }),
+  adapter: makeAdapter(process.env['DATABASE_URL'] ?? ''),
 });
 
 const hhmm = (h: number, m = 0) => h * 60 + m;
@@ -75,3 +75,15 @@ async function main(): Promise<void> {
   console.log('Seeded planning areas, localities, settings, a demo login and a demo day.');
   console.log(`  sign in: ${email} / loadless`);
 }
+
+/*
+ * Without this the script defines main() and exits silently having done nothing — which is
+ * exactly what it did after the port to packages/core, giving a clean exit and an empty
+ * database.
+ */
+main()
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

@@ -1,5 +1,5 @@
-import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client';
+import { makeAdapter } from './pg-config';
 
 export type Db = PrismaClient;
 
@@ -22,7 +22,7 @@ export function db(): Db {
     throw new Error('DATABASE_URL is not set.');
   }
 
-  const client = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+  const client = new PrismaClient({ adapter: makeAdapter(connectionString) });
   globalForPrisma.__lebanonDb = client;
   return client;
 }

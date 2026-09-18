@@ -37,10 +37,13 @@ export async function clearSession(): Promise<void> {
   (await cookies()).delete(SESSION_COOKIE);
 }
 
-/** Throws UnauthorizedError, which the handler wrapper turns into a 401. */
-export async function requireUser(): Promise<SessionUser> {
+/**
+ * Reads the session without throwing. Pages use this so they can decide to redirect before
+ * rendering anything; API routes use requireUser below, which turns absence into a 401.
+ */
+export async function currentUser(): Promise<SessionUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!token) throw new UnauthorizedError();
+  if (!token) return null;
 
   try {
     const { payload } = await jwtVerify(token, key());
@@ -50,6 +53,13 @@ export async function requireUser(): Promise<SessionUser> {
       name: String(payload['name'] ?? ''),
     };
   } catch {
-    throw new UnauthorizedError('Your session has expired. Please sign in again.');
+    return null;
   }
+}
+
+/** Throws UnauthorizedError, which the handler wrapper turns into a 401. */
+export async function requireUser(): Promise<SessionUser> {
+  const user = await currentUser();
+  if (!user) throw new UnauthorizedError('Your session has expired. Please sign in again.');
+  return user;
 }
