@@ -9,6 +9,7 @@ import { ErrorPanel } from '@/components/ui/ErrorPanel';
 import { MapCanvas, type MapStop } from '@/features/map/MapCanvas';
 import { DaySummary } from '@/features/schedule/DaySummary';
 import { ScheduleRail } from '@/features/schedule/ScheduleRail';
+import { isInsideLebanon } from '@/features/map/lebanon-border';
 import { scheduleApi } from '@/features/schedule/api';
 import { useAppointments, useDay, useGeometry } from '@/features/schedule/useDay';
 import { useSettings } from '@/features/schedule/useSettings';
@@ -29,6 +30,7 @@ export function WorkspaceClient({ date }: { date: string }) {
   const [draft, setDraft] = useState<ReservationDraft | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<MobileTab>('schedule');
+  const [mapClickError, setMapClickError] = useState<string | null>(null);
 
   const patchDraft = (patch: Partial<ReservationDraft>) =>
     setDraft((current) => (current ? { ...current, ...patch } : current));
@@ -92,6 +94,18 @@ export function WorkspaceClient({ date }: { date: string }) {
 
   const handleMapClick = async (coordinate: Coordinate) => {
     if (!draft) return;
+
+    /*
+     * The map is framed on Lebanon but the viewport is wider than the country, so the sea and a
+     * slice of Syria are both on screen and both clickable. A slip of the mouse would otherwise
+     * become a customer's address, and the day would be planned around driving to it.
+     */
+    if (!isInsideLebanon(coordinate.latitude, coordinate.longitude)) {
+      setMapClickError('That spot is outside Lebanon — place the pin on the customer’s address.');
+      return;
+    }
+    setMapClickError(null);
+
     patchDraft({
       latitude: coordinate.latitude,
       longitude: coordinate.longitude,
@@ -193,7 +207,12 @@ export function WorkspaceClient({ date }: { date: string }) {
           ].join(' ')}
         >
           {draft ? (
-            <ReservationDrawer draft={draft} onChange={patchDraft} onClose={() => setDraft(null)} />
+            <ReservationDrawer
+              draft={draft}
+              onChange={patchDraft}
+              onClose={() => setDraft(null)}
+              notice={mapClickError}
+            />
           ) : loading ? (
             <div className="flex flex-1 items-center justify-center">
               <Spinner label="Loading the day…" />

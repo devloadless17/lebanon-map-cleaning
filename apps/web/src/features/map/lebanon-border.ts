@@ -274,3 +274,24 @@ export const LEBANON_BORDER: ReadonlyArray<readonly [number, number]> = [
   [34.6825, 36.3558],
   [34.6924, 36.3385],
 ];
+
+
+/**
+ * Whether a coordinate falls inside Lebanon, tested against the same border the map dims around.
+ *
+ * A bounding box cannot do this job: the sea off Beirut and a stretch of Syria both sit inside
+ * any rectangle drawn around the country, and a stray click in either would otherwise become a
+ * customer's address. Standard ray casting — the border is a simple closed ring.
+ */
+export function isInsideLebanon(latitude: number, longitude: number): boolean {
+  let inside = false;
+  for (let i = 0, j = LEBANON_BORDER.length - 1; i < LEBANON_BORDER.length; j = i++) {
+    const [latI, lonI] = LEBANON_BORDER[i]!;
+    const [latJ, lonJ] = LEBANON_BORDER[j]!;
+    const straddles = latI > latitude !== latJ > latitude;
+    if (straddles && longitude < ((lonJ - lonI) * (latitude - latI)) / (latJ - latI) + lonI) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}

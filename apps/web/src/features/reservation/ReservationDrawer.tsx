@@ -13,6 +13,8 @@ import { useRoutePreview } from './useRoutePreview';
 
 interface Props {
   draft: ReservationDraft;
+  /** Raised by the workspace, e.g. a map click that landed outside Lebanon. */
+  notice?: string | null;
   onChange: (patch: Partial<ReservationDraft>) => void;
   onClose: () => void;
 }
@@ -23,7 +25,7 @@ interface Props {
  * That is the whole product thesis: you book while watching what the booking does to the day.
  * A modal over the map would reduce this to an ordinary booking form.
  */
-export function ReservationDrawer({ draft, onChange, onClose }: Props) {
+export function ReservationDrawer({ draft, onChange, onClose, notice }: Props) {
   const preview = useRoutePreview(draft);
   const queryClient = useQueryClient();
   const [manualTime, setManualTime] = useState('');
@@ -225,6 +227,10 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
             </>
           )}
         </section>
+
+        {notice ? (
+          <p className="rounded-md bg-warn-soft px-2.5 py-2 text-xs text-warn">{notice}</p>
+        ) : null}
 
         {saveError ? (
           <p className="rounded-md bg-bad-soft px-2.5 py-2 text-xs text-bad">
