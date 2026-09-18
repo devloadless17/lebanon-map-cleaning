@@ -10,6 +10,10 @@ interface Props {
   selected: number | null;
   loading: boolean;
   onPick: (minutes: number) => void;
+  /** The availability window is today and has already elapsed. */
+  windowPassed: boolean;
+  windowStart: number;
+  windowEnd: number;
 }
 
 /**
@@ -19,7 +23,16 @@ interface Props {
  * report "no availability" for a slot that genuinely exists — and a scheduler asked "can you do
  * 14:37?" can answer straight from a band without another round trip.
  */
-export function TimeBands({ bands, bandsRequiringMove, selected, loading, onPick }: Props) {
+export function TimeBands({
+  bands,
+  bandsRequiringMove,
+  selected,
+  loading,
+  onPick,
+  windowPassed,
+  windowStart,
+  windowEnd,
+}: Props) {
   if (loading) {
     return (
       <div className="py-6 text-center">
@@ -31,8 +44,16 @@ export function TimeBands({ bands, bandsRequiringMove, selected, loading, onPick
   if (bands.length === 0) {
     return (
       <div className="space-y-3">
+        {/*
+          Two different failures used to read the same way. A window that has simply gone past is
+          not the customer being hard to fit, and saying so sends the scheduler hunting for a
+          routing problem that is not there — most often on today's date, late in the day, looking
+          at an appointment that is running perfectly well.
+        */}
         <p className="rounded-lg bg-bad-soft px-3 py-2.5 text-sm text-bad">
-          No time on this day fits the customer’s availability.
+          {windowPassed
+            ? `${formatClock(windowStart)}–${formatClock(windowEnd)} has already passed today. Pick a later time, or another day.`
+            : 'No time on this day fits the customer’s availability.'}
         </p>
 
         {bandsRequiringMove.length > 0 ? (

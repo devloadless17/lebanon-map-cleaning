@@ -81,6 +81,18 @@ export function beirutToday(): string {
   }).format(new Date());
 }
 
+/** Minutes since local midnight in Beirut — the same clock the schedule is stored in. */
+export function beirutMinutesNow(): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Beirut',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return get('hour') * 60 + get('minute');
+}
+
 export function formatDateLabel(isoDate: string): string {
   const date = new Date(`${isoDate}T12:00:00Z`);
   return new Intl.DateTimeFormat('en-GB', {

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Button, Field, Input } from '@/components/ui/primitives';
 import { TimeInput } from '@/components/ui/TimeInput';
 import { api } from '@/lib/api/client';
-import { formatClock, parseClock } from '@/lib/time';
+import { beirutMinutesNow, beirutToday, formatClock, parseClock } from '@/lib/time';
 import { LocationPicker } from './LocationPicker';
 import { TimeBands } from './TimeBands';
 import { bookLabel, isSavable, type ReservationDraft } from './draft';
@@ -218,6 +218,9 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
             <TimeBands
               bands={bands}
               bandsRequiringMove={preview.data?.bandsRequiringMove ?? []}
+              windowPassed={draft.date === beirutToday() && draft.windowEnd <= beirutMinutesNow()}
+              windowStart={draft.windowStart}
+              windowEnd={draft.windowEnd}
               selected={draft.promisedStart}
               loading={preview.isFetching && !preview.data}
               onPick={(minutes) => {
