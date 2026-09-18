@@ -75,3 +75,18 @@ export const PRECISION_LABEL: Record<LocationPrecision, string> = {
   LANDMARK: 'Near a landmark — about 150 m',
   EXACT: 'Exact location',
 };
+
+/**
+ * What the Book button should say.
+ *
+ * `isSavable` needs a name, a phone, a location AND a time, but the button used to report only
+ * the time — so a user who had not typed a name saw a greyed "Pick a time" and no clue what was
+ * actually blocking them.
+ */
+export function bookLabel(draft: ReservationDraft): string {
+  if (draft.customerName.trim().length === 0) return 'Add a customer name';
+  if (draft.customerPhone.trim().length < 6) return 'Add a phone number';
+  if (draft.latitude === null) return 'Set a location';
+  if (draft.promisedStart === null) return 'Pick a time';
+  return `Book ${String(Math.floor(draft.promisedStart / 60)).padStart(2, '0')}:${String(draft.promisedStart % 60).padStart(2, '0')}`;
+}

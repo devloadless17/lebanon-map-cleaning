@@ -6,11 +6,14 @@ import { Button, cx } from '@/components/ui/primitives';
 import { api } from '@/lib/api/client';
 import { beirutToday } from '@/lib/time';
 
-const LINKS = [
-  { href: `/schedule/${''}`, label: 'Schedule', match: '/schedule' },
-  { href: '/customers', label: 'Customers', match: '/customers' },
-  { href: '/settings', label: 'Settings', match: '/settings' },
-] as const;
+/**
+ * Only the schedule is linked.
+ *
+ * Customers and Settings still exist and are still reachable by typing their URL — which is how
+ * the depot gets configured during setup — they are simply not advertised, so a client trying
+ * the demo sees one screen and one story instead of a settings panel.
+ */
+const LINKS = [{ href: '/schedule', label: 'Schedule', match: '/schedule' }] as const;
 
 /**
  * One nav for the whole app.

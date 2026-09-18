@@ -15,12 +15,12 @@ export class ZodValidationPipe<T> implements PipeTransform {
     const result = this.schema.safeParse(value);
     if (result.success) return result.data;
 
-    const detail = result.error.issues
-      .map((issue) => {
-        const path = issue.path.join('.');
-        return path ? `${path}: ${issue.message}` : issue.message;
-      })
-      .join('; ');
+    // Deliberately WITHOUT the field path. These messages surface directly to the user, and
+    // the "or enter any time" override is the most-used control in the product — a scheduler
+    // typing 08:00 into a 13:00-17:00 window should read "the visit would start before the
+    // customer is available", not "promisedStart: ...". The schemas already phrase every
+    // message as a sentence, so the path adds nothing but noise.
+    const detail = result.error.issues.map((issue) => issue.message).join('. ');
     throw new ValidationError(detail);
   }
 }

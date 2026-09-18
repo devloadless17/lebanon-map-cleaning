@@ -2,7 +2,7 @@
 
 import type { Band, BandRequiringMove, Feedback } from '@lebanon/contracts';
 import { Badge, Spinner } from '@/components/ui/primitives';
-import { formatClock, formatDuration, formatKm } from '@/lib/time';
+import { formatClock, formatDistanceDelta, formatDuration } from '@/lib/time';
 
 interface Props {
   bands: Band[];
@@ -92,7 +92,7 @@ export function TimeBands({ bands, bandsRequiringMove, selected, loading, onPick
             </div>
 
             <p className="tabular mt-1 text-xs text-ink-soft">
-              +{formatKm(band.deltaMetres)} · +{band.deltaMinutes} min · back{' '}
+              +{formatDistanceDelta(band.deltaMetres)} · +{band.deltaMinutes} min · back{' '}
               {formatClock(band.returnTime)} ·{' '}
               {formatDuration(Math.max(band.residualSlackMinutes, 0))} buffer
             </p>

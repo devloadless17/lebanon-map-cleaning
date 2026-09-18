@@ -25,9 +25,8 @@ export function ErrorPanel({ error, onRetry }: { error: unknown; onRetry: () => 
         <p className="mt-1.5 text-sm text-ink-muted">{message}</p>
 
         {unreachable ? (
-          <p className="mt-3 rounded-lg bg-surface-sunken px-3 py-2.5 text-left text-xs text-ink-soft">
-            The API does not seem to be running. Start everything with:
-            <code className="mt-1.5 block font-mono text-ink">npm run dev</code>
+          <p className="mt-3 rounded-lg bg-surface-sunken px-3 py-2.5 text-xs text-ink-soft">
+            This is usually temporary. Wait a moment and try again.
           </p>
         ) : null}
 

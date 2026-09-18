@@ -59,14 +59,25 @@ export class DayRepository {
   }
 
   /**
+   * Creates the settings row on first use rather than throwing.
+   *
+   * `findUniqueOrThrow` here meant a freshly migrated but unseeded database answered the main
+   * screen with a 500 — and the one page that could have fixed it, Settings, reads the same
+   * row, so there was no way out from inside the app.
+   */
+  private async settings() {
+    const existing = await this.prisma.daySettings.findUnique({ where: { id: 'singleton' } });
+    if (existing) return existing;
+    return this.prisma.daySettings.create({ data: { ...DEFAULT_SETTINGS } });
+  }
+
+  /**
    * `now` is supplied ONLY when the requested date is today in Asia/Beirut — that is what stops
    * the scanner offering a slot that has already passed, which matters because booking for
    * today is the common case.
    */
   async contextFor(date: string): Promise<DayContext> {
-    const settings = await this.prisma.daySettings.findUniqueOrThrow({
-      where: { id: 'singleton' },
-    });
+    const settings = await this.settings();
 
     return {
       date,
@@ -82,6 +93,22 @@ export class DayRepository {
     };
   }
 }
+
+/**
+ * Sensible starting point for a fresh deployment: central Beirut, an eight-to-seven day.
+ * Whoever sets the business up replaces these in Settings; they exist so the app never greets
+ * a new database with a 500 on its main screen.
+ */
+const DEFAULT_SETTINGS = {
+  id: 'singleton',
+  depotLatitude: 33.8938,
+  depotLongitude: 35.5018,
+  depotLabel: 'Beirut — Depot',
+  workdayStart: 8 * 60,
+  workdayEnd: 19 * 60,
+  defaultServiceMinutes: 120,
+  accessBufferMinutes: 10,
+} as const;
 
 const BEIRUT_TZ = 'Asia/Beirut';
 

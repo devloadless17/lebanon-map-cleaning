@@ -69,7 +69,22 @@ export class CatalogController {
 
   @Get('settings')
   async settings() {
-    const row = await this.prisma.daySettings.findUniqueOrThrow({ where: { id: 'singleton' } });
+    // Mirrors DayRepository: create on first read rather than throwing, so a fresh deployment
+    // can be configured from the UI instead of needing SQL.
+    const row = await this.prisma.daySettings.upsert({
+      where: { id: 'singleton' },
+      update: {},
+      create: {
+        id: 'singleton',
+        depotLatitude: 33.8938,
+        depotLongitude: 35.5018,
+        depotLabel: 'Beirut — Depot',
+        workdayStart: 8 * 60,
+        workdayEnd: 19 * 60,
+        defaultServiceMinutes: 120,
+        accessBufferMinutes: 10,
+      },
+    });
     return toSettings(row);
   }
 

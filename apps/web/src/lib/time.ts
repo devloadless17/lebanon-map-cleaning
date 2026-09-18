@@ -31,6 +31,19 @@ export function formatKm(metres: number): string {
   return `${Math.round(metres / 1000)} km`;
 }
 
+/**
+ * A detour, at a resolution that does it justice.
+ *
+ * Rounding to whole kilometres printed the near-zero detours as "+0 km" — and those are exactly
+ * the slots the product exists to find, so its best answer read like a rendering fault.
+ */
+export function formatDistanceDelta(metres: number): string {
+  const rounded = Math.round(metres);
+  if (Math.abs(rounded) < 1000) return `${rounded} m`;
+  const km = rounded / 1000;
+  return `${Math.abs(km) < 10 ? km.toFixed(1) : Math.round(km)} km`;
+}
+
 const BEIRUT = 'Asia/Beirut';
 
 /** The team's "today" is a Beirut calendar day, never the browser's or the server's. */

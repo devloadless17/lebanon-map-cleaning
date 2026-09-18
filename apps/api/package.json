@@ -18,7 +18,9 @@
     "db:studio": "prisma studio",
     "bootstrap:admin": "node dist/scripts/bootstrap-admin.js",
     "check:google": "dotenv -e ../../.env -- tsx src/scripts/check-google.ts",
-    "cache:clear": "dotenv -e ../../.env -- tsx src/scripts/clear-travel-cache.ts"
+    "cache:clear": "dotenv -e ../../.env -- tsx src/scripts/clear-travel-cache.ts",
+    "demo:reset": "node dist/scripts/reset-demo.js",
+    "demo:reset:dev": "dotenv -e ../../.env -- tsx src/scripts/reset-demo.ts"
   },
   "dependencies": {
     "@lebanon/contracts": "*",

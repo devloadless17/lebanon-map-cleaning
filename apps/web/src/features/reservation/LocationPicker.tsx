@@ -94,8 +94,8 @@ export function LocationPicker({ draft, onChange }: Props) {
           </p>
           {draft.precision !== 'EXACT' ? (
             <p className="mt-1.5 text-xs text-warn">
-              Drag the pin on the map to set the exact door — the circle shows how much we’re
-              guessing.
+              Click the exact spot on the map to place the pin — the circle shows how much
+              we’re guessing until you do.
             </p>
           ) : null}
         </div>

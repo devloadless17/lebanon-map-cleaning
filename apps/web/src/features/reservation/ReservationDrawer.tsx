@@ -8,7 +8,7 @@ import { api } from '@/lib/api/client';
 import { formatClock, parseClock } from '@/lib/time';
 import { LocationPicker } from './LocationPicker';
 import { TimeBands } from './TimeBands';
-import { isSavable, type ReservationDraft } from './draft';
+import { bookLabel, isSavable, type ReservationDraft } from './draft';
 import { useRoutePreview } from './useRoutePreview';
 
 interface Props {
@@ -31,28 +31,45 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
 
   const save = useMutation({
     mutationFn: async () => {
+      const locationPayload = {
+        addressText: draft.addressText || draft.locationInput || 'Pinned location',
+        latitude: draft.latitude,
+        longitude: draft.longitude,
+        precision: draft.precision,
+        localityId: draft.localityId,
+        plusCode: draft.plusCode,
+        landmarkNotes: draft.landmarkNotes || null,
+      };
+      const customerPayload = {
+        name: draft.customerName.trim(),
+        phone: draft.customerPhone.trim(),
+      };
+
       let customerId = draft.customerId;
-      if (!customerId) {
-        const customer = await api.post<{ id: string }>('/customers', {
-          name: draft.customerName.trim(),
-          phone: draft.customerPhone.trim(),
-        });
+      if (customerId) {
+        await api.patch(`/customers/${customerId}`, customerPayload);
+      } else {
+        const customer = await api.post<{ id: string }>('/customers', customerPayload);
         customerId = customer.id;
+        // Written back into the draft so a retry after a rejected booking REUSES this customer
+        // instead of creating another one. Without it, three failed attempts leave three
+        // duplicate customers behind.
+        onChange({ customerId });
       }
 
       let locationId = draft.locationId;
-      if (!locationId) {
+      if (locationId) {
+        // Previously skipped when editing, which meant moving the pin visibly moved the marker
+        // and recomputed every suggested time at the new place — then saved the OLD location.
+        // Worse than doing nothing, because the times offered were for somewhere else.
+        await api.patch(`/locations/${locationId}`, locationPayload);
+      } else {
         const location = await api.post<{ id: string }>('/locations', {
           customerId,
-          addressText: draft.addressText || draft.locationInput || 'Pinned location',
-          latitude: draft.latitude,
-          longitude: draft.longitude,
-          precision: draft.precision,
-          localityId: draft.localityId,
-          plusCode: draft.plusCode,
-          landmarkNotes: draft.landmarkNotes || null,
+          ...locationPayload,
         });
         locationId = location.id;
+        onChange({ locationId });
       }
 
       if (draft.appointmentId) {
@@ -276,11 +293,7 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
             save.mutate();
           }}
         >
-          {save.isPending
-            ? 'Saving…'
-            : draft.promisedStart !== null
-              ? `Book ${formatClock(draft.promisedStart)}`
-              : 'Pick a time'}
+          {save.isPending ? 'Saving…' : bookLabel(draft)}
         </Button>
       </footer>
     </div>

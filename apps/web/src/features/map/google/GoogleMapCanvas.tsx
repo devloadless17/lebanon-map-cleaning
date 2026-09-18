@@ -179,11 +179,29 @@ export function GoogleMapCanvas({
     const map = mapRef.current;
     if (!ready || !map || stops.length === 0) return;
 
+    // Fewer than two DISTINCT points has no extent, and Google answers that by slamming to
+    // maximum zoom — one building filling the screen. Settings (the depot) resolve before the
+    // day's appointments, so without this it fires on every single load, not just empty days.
+    // The OpenStreetMap renderer already guards this; the guard was never ported here.
+    const distinct = new Set(
+      stops.map((s) => `${s.coordinate.latitude.toFixed(4)},${s.coordinate.longitude.toFixed(4)}`),
+    );
+    if (distinct.size < 2) {
+      map.fitBounds(LEBANON_RESTRICTION.latLngBounds, 24);
+      return;
+    }
+
     const bounds = new google.maps.LatLngBounds();
     for (const stop of stops) {
       bounds.extend({ lat: stop.coordinate.latitude, lng: stop.coordinate.longitude });
     }
     map.fitBounds(bounds, 64);
+    // Matches the other renderer: several stops in one town should not zoom to street level and
+    // lose the sense of where in the country the day is happening.
+    const listener = google.maps.event.addListenerOnce(map, 'idle', () => {
+      if ((map.getZoom() ?? 0) > 12) map.setZoom(12);
+    });
+    return () => listener.remove();
   }, [ready, stops.length]);
 
   // Two stops at one doorstep land on the same point and the upper one hides the lower — which
