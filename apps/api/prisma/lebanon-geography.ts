@@ -70,7 +70,7 @@ export const PLANNING_AREAS = [
 ] as const;
 
 export const DEFAULT_DEPOT = {
-  label: 'Beirut — Depot',
-  latitude: 33.8938,
-  longitude: 35.5018,
+  label: 'Hamra, Beirut',
+  latitude: 33.8959,
+  longitude: 35.4797,
 } as const;

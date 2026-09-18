@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { decodePolyline, PRECISION_METRES, type MapCanvasProps, type MapStop } from '../types';
+import { LEBANON_BORDER } from '../lebanon-border';
 import { loadGoogleMaps } from './loader';
 
 /*
@@ -73,6 +74,39 @@ export function GoogleMapCanvas({
           zoomControl: true,
           gestureHandling: 'greedy',
           clickableIcons: false,
+        });
+
+        // Dim everything outside the country.
+        //
+        // `restriction` only stops the user panning away; it does not crop what is drawn, and
+        // Lebanon is ~200 km tall by ~50 km wide, so filling a landscape pane vertically always
+        // leaves a few hundred kilometres of Syria on screen. A world-sized polygon with a
+        // Lebanon-shaped hole pushes the neighbours back without hiding them.
+        new google.maps.Polygon({
+          map: mapRef.current ?? undefined,
+          paths: [
+            [
+              { lat: 40, lng: 28 }, { lat: 40, lng: 42 },
+              { lat: 28, lng: 42 }, { lat: 28, lng: 28 },
+            ],
+            LEBANON_BORDER.map(([lat, lng]) => ({ lat, lng })),
+          ],
+          strokeWeight: 0,
+          fillColor: '#f8fafc',
+          fillOpacity: 0.72,
+          clickable: false,
+          zIndex: 1,
+        });
+
+        new google.maps.Polygon({
+          map: mapRef.current ?? undefined,
+          paths: LEBANON_BORDER.map(([lat, lng]) => ({ lat, lng })),
+          strokeColor: '#94a3b8',
+          strokeWeight: 1,
+          strokeOpacity: 0.9,
+          fillOpacity: 0,
+          clickable: false,
+          zIndex: 2,
         });
 
         setReady(true);
@@ -260,7 +294,10 @@ function StopPin({ stop, offset }: { stop: MapStop; offset: { dx: number; dy: nu
 
   return (
     <div
-      className="flex flex-col items-center gap-1"
+      // Depot label ABOVE its pin, stops below: the depot sits a few km from the first
+      // stop, so at country zoom two labels under two pins overlap into an unreadable
+      // pile right where the eye lands.
+      className={`flex items-center gap-1 ${isDepot ? 'flex-col-reverse' : 'flex-col'}`}
       style={{ transform: `translate(${offset.dx}px, calc(-50% + ${offset.dy}px))` }}
     >
       <div
@@ -278,7 +315,7 @@ function StopPin({ stop, offset }: { stop: MapStop; offset: { dx: number; dy: nu
         {stop.sequence ?? (isDepot ? '◆' : '+')}
       </div>
       <span className="rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-[#1c1917] shadow-sm">
-        {stop.time ? `${stop.time} · ${stop.label}` : stop.label}
+        {stop.time ?? stop.label}
       </span>
     </div>
   );

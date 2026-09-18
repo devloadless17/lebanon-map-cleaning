@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Field, Input } from '@/components/ui/primitives';
 import { TimeInput } from '@/components/ui/TimeInput';
 import { api } from '@/lib/api/client';
@@ -120,6 +120,20 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
 
   const bands = preview.data?.bands ?? [];
   const dayBroken = preview.data ? !preview.data.dayHealth.feasible : false;
+
+  // Preselect the best slot once the options arrive.
+  //
+  // Leaving nothing chosen meant the primary button read "Pick a time" while a perfectly good
+  // slot sat immediately above it — an extra click for no decision, and a dead-looking button
+  // for anyone exploring on their own. The system proposes; the scheduler can still take a
+  // different band or type any time at all.
+  const best = bands[0];
+  useEffect(() => {
+    if (draft.promisedStart === null && best) {
+      onChange({ promisedStart: best.recommended });
+      setManualTime(formatClock(best.recommended));
+    }
+  }, [best, draft.promisedStart, onChange]);
 
   return (
     <div className="animate-in flex h-full flex-col bg-surface">

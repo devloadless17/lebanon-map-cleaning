@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { PRECISION_METRES, decodePolyline, type MapCanvasProps, type MapStop } from './types';
+import { LEBANON_BORDER } from './lebanon-border';
 
 /*
  * The team only ever works in Lebanon, so the map is confined to it: panning stops at the
@@ -75,6 +76,20 @@ export function OpenMapCanvas({ stops, polyline, onSelect, onMapClick, className
     map.fitBounds(LEBANON_BOUNDS);
     L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: MAX_ZOOM }).addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // Same treatment as the Google renderer: a world-sized polygon with a Lebanon-shaped hole,
+    // so the surrounding countries recede instead of competing with the route.
+    const hole = LEBANON_BORDER.map(([lat, lng]) => [lat, lng] as L.LatLngTuple);
+    L.polygon(
+      [
+        [[40, 28], [40, 42], [28, 42], [28, 28]] as L.LatLngTuple[],
+        hole,
+      ],
+      { stroke: false, fillColor: '#f8fafc', fillOpacity: 0.72, interactive: false },
+    ).addTo(map);
+    L.polygon(hole, {
+      color: '#94a3b8', weight: 1, opacity: 0.9, fill: false, interactive: false,
+    }).addTo(map);
     map.on('click', (event: L.LeafletMouseEvent) => {
       clickRef.current?.({ latitude: event.latlng.lat, longitude: event.latlng.lng });
     });
@@ -256,7 +271,8 @@ function StopPin({ stop, offset }: { stop: MapStop; offset: { dx: number; dy: nu
 
   return (
     <div
-      className="flex cursor-pointer flex-col items-center"
+      // Depot label ABOVE its pin, stops below — otherwise the two collide at country zoom.
+      className={`flex cursor-pointer items-center ${isDepot ? 'flex-col-reverse' : 'flex-col'}`}
       style={{ transform: `translate(calc(-50% + ${offset.dx}px), calc(-50% + ${offset.dy}px))` }}
     >
       <div
@@ -276,7 +292,7 @@ function StopPin({ stop, offset }: { stop: MapStop; offset: { dx: number; dy: nu
         {stop.sequence ?? (isDepot ? '◆' : '+')}
       </div>
       <span className="mt-1 rounded bg-white/90 px-1.5 py-0.5 text-[11px] font-medium whitespace-nowrap text-ink shadow-sm">
-        {stop.time ? `${stop.time} · ${stop.label}` : stop.label}
+        {stop.time ?? stop.label}
       </span>
     </div>
   );

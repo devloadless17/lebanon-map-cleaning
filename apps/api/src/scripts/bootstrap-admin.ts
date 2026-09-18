@@ -44,11 +44,11 @@ async function main(): Promise<void> {
       await prisma.daySettings.create({
         data: {
           id: 'singleton',
-          depotLatitude: 33.8938,
-          depotLongitude: 35.5018,
-          depotLabel: 'Beirut — Depot',
-          workdayStart: 8 * 60,
-          workdayEnd: 19 * 60,
+          depotLatitude: 33.8959,
+          depotLongitude: 35.4797,
+          depotLabel: 'Hamra, Beirut',
+          workdayStart: 0,
+          workdayEnd: 23 * 60 + 59,
           defaultServiceMinutes: 120,
           accessBufferMinutes: 10,
         },
