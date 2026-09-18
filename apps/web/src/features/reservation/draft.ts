@@ -88,5 +88,8 @@ export function bookLabel(draft: ReservationDraft): string {
   if (draft.customerPhone.trim().length < 6) return 'Add a phone number';
   if (draft.latitude === null) return 'Set a location';
   if (draft.promisedStart === null) return 'Pick a time';
-  return `Book ${String(Math.floor(draft.promisedStart / 60)).padStart(2, '0')}:${String(draft.promisedStart % 60).padStart(2, '0')}`;
+  const h24 = Math.floor(draft.promisedStart / 60);
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const minutes = String(draft.promisedStart % 60).padStart(2, '0');
+  return `Book ${h12}:${minutes} ${h24 < 12 ? 'AM' : 'PM'}`;
 }

@@ -6,17 +6,42 @@
 export function formatClock(minutes: number): string {
   const nextDay = minutes >= 1440;
   const wrapped = ((minutes % 1440) + 1440) % 1440;
-  const h = Math.floor(wrapped / 60);
+  const h24 = Math.floor(wrapped / 60);
   const m = wrapped % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}${nextDay ? ' +1d' : ''}`;
+  // 12-hour, because this is read aloud to customers on the phone. Midnight is 12 AM and noon
+  // is 12 PM, which is the one place a naive h % 12 gives 0 and looks broken.
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const suffix = h24 < 12 ? 'AM' : 'PM';
+  return `${h12}:${String(m).padStart(2, '0')} ${suffix}${nextDay ? ' +1d' : ''}`;
 }
 
+/**
+ * Accepts what people actually type: "5:30 PM", "5pm", "17:30", "5.30pm".
+ *
+ * A bare "5" is deliberately rejected — it could be morning or evening, and silently guessing
+ * would book someone twelve hours out. Requiring either a colon or an am/pm marker also stops
+ * a half-typed value being committed while the user is still typing.
+ */
 export function parseClock(value: string): number | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  const text = value.trim().toLowerCase().replace(/\./g, ':');
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(text);
   if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
+
+  let hours = Number(match[1]);
+  const minutes = match[2] === undefined ? 0 : Number(match[2]);
+  const meridiem = match[3];
+
+  if (minutes > 59) return null;
+  if (match[2] === undefined && !meridiem) return null; // bare "5" is ambiguous
+
+  if (meridiem) {
+    if (hours < 1 || hours > 12) return null;
+    if (meridiem === 'pm' && hours !== 12) hours += 12;
+    if (meridiem === 'am' && hours === 12) hours = 0;
+  } else if (hours > 23) {
+    return null;
+  }
+
   return hours * 60 + minutes;
 }
 

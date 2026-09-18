@@ -31,7 +31,7 @@ export function TimeInput({ value, onCommit, 'aria-label': ariaLabel }: Props) {
       value={text}
       aria-label={ariaLabel}
       inputMode="numeric"
-      placeholder="09:00"
+      placeholder="9:00 AM"
       onChange={(event) => {
         const next = event.target.value;
         setText(next);

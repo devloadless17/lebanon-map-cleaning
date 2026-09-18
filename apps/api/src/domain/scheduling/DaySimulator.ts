@@ -20,12 +20,15 @@ export function orderStops(stops: readonly ScheduledStop[]): ScheduledStop[] {
   );
 }
 
+/** 12-hour, matching the UI: these strings are read to customers, not to developers. */
 function formatClock(minutes: number): string {
   const wrapped = ((minutes % 1440) + 1440) % 1440;
-  const h = Math.floor(wrapped / 60);
+  const h24 = Math.floor(wrapped / 60);
   const m = wrapped % 60;
-  const suffix = minutes >= 1440 ? ' (+1d)' : '';
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}${suffix}`;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  const meridiem = h24 < 12 ? 'AM' : 'PM';
+  const nextDay = minutes >= 1440 ? ' (+1d)' : '';
+  return `${h12}:${String(m).padStart(2, '0')} ${meridiem}${nextDay}`;
 }
 
 /**

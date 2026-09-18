@@ -199,7 +199,8 @@ export class AppointmentsService {
 }
 
 function formatClock(minutes: number): string {
-  const h = Math.floor(minutes / 60) % 24;
+  const h24 = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
 }

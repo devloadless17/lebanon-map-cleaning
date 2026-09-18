@@ -20,8 +20,6 @@ const LEBANON_BOUNDS: L.LatLngBoundsLiteral = [
   [34.95, 36.90], // north-east, past the Bekaa
 ];
 
-/** Zoom 8 already fits the whole country, even in a phone-width pane. */
-const MIN_ZOOM = 8;
 const MAX_ZOOM = 18;
 
 /*
@@ -43,7 +41,7 @@ const TILE_ATTRIBUTION =
   process.env.NEXT_PUBLIC_MAP_TILE_ATTRIBUTION ??
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-export function OpenMapCanvas({ stops, polyline, onSelect, onMapClick, className }: MapCanvasProps) {
+export function OpenMapCanvas({ stops, polyline, onSelect, onMapClick, className, focus }: MapCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef(new Map<string, L.Marker>());
@@ -51,6 +49,8 @@ export function OpenMapCanvas({ stops, polyline, onSelect, onMapClick, className
   const routeRef = useRef<L.Polyline | null>(null);
   const nodesRef = useRef(new Map<string, HTMLDivElement>());
   const fittedRef = useRef('');
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
   const clickRef = useRef(onMapClick);
   const selectRef = useRef(onSelect);
   // Leaflet builds its marker elements outside React, so the portals need one nudge once those
@@ -67,13 +67,22 @@ export function OpenMapCanvas({ stops, polyline, onSelect, onMapClick, className
 
     const map = L.map(containerRef.current, {
       zoomControl: false,
-      minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
-      maxBounds: LEBANON_BOUNDS,
-      // 1.0 makes the edge solid rather than springy — the map simply will not go past it.
-      maxBoundsViscosity: 1,
     });
-    map.fitBounds(LEBANON_BOUNDS);
+    // Frame the country, then make that the floor: zoom in freely, never back out past it.
+    // Measured rather than hardcoded, because the fitting zoom depends on the window size.
+    // Same ordering as the Google renderer: frame the country, read the resulting zoom, then
+    // lock it as the floor and switch panning limits on.
+    if (focusRef.current) {
+      map.setView(
+        [focusRef.current.coordinate.latitude, focusRef.current.coordinate.longitude],
+        focusRef.current.zoom,
+      );
+    } else {
+      map.fitBounds(LEBANON_BOUNDS);
+    }
+    map.setMinZoom(Math.min(map.getZoom(), 8));
+    map.setMaxBounds(L.latLngBounds(LEBANON_BOUNDS).pad(0.25));
     L.tileLayer(TILE_URL, { attribution: TILE_ATTRIBUTION, maxZoom: MAX_ZOOM }).addTo(map);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
@@ -179,37 +188,8 @@ export function OpenMapCanvas({ stops, polyline, onSelect, onMapClick, className
     }).addTo(map);
   }, [polyline, stops]);
 
-  // Fit only when the route's SHAPE changes, so the user's own pan and zoom survive everything
-  // else they do.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const points = stops.map(
-      (s) => [s.coordinate.latitude, s.coordinate.longitude] as L.LatLngTuple,
-    );
-    const distinct = new Set(points.map(([lat, lng]) => `${lat.toFixed(4)},${lng.toFixed(4)}`));
-
-    const signature = [...distinct].sort().join('|');
-    if (signature === fittedRef.current) return;
-    fittedRef.current = signature;
-
-    // Fewer than two distinct points has no extent to fit, and Leaflet answers a zero-size
-    // bounds by slamming to maximum zoom. Since settings (the depot) arrive before the day's
-    // appointments, that briefly happens on EVERY load — and it is what left the map staring at
-    // one street in Beirut. Show the country instead until there is a real route to frame.
-    if (distinct.size < 2) {
-      map.fitBounds(LEBANON_BOUNDS);
-      return;
-    }
-
-    map.fitBounds(L.latLngBounds(points), {
-      padding: [80, 80],
-      // Keeps several stops in one town from zooming to street level and losing the sense of
-      // where in the country the day is actually happening.
-      maxZoom: 12,
-    });
-  }, [stops]);
+  // Deliberately no per-day refit: every route is inside Lebanon and Lebanon is always in
+  // frame, so refitting only made the map lurch between dates.
 
   // Two stops at one doorstep — or two locality-precision pins sharing a centroid — land on the
   // exact same point, and the upper one hides the lower entirely. The brief's own example does

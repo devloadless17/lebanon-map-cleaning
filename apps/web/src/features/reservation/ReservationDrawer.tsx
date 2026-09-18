@@ -233,7 +233,7 @@ export function ReservationDrawer({ draft, onChange, onClose }: Props) {
             <Field label="Or enter any time">
               <Input
                 value={manualTime}
-                placeholder="16:15"
+                placeholder="4:15 PM"
                 onChange={(event) => setManualTime(event.target.value)}
                 onBlur={() => {
                   const minutes = parseClock(manualTime);

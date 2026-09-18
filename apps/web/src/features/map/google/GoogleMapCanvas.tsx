@@ -16,7 +16,9 @@ const LEBANON_RESTRICTION = {
   strictBounds: false,
 };
 const LEBANON_CENTER = { lat: 33.85, lng: 35.75 };
-const MIN_ZOOM = 8;
+
+/** The country itself, used to frame the opening view. Tighter than the pan restriction. */
+const LEBANON_BOUNDS = { south: 33.02, west: 35.08, north: 34.7, east: 36.64 };
 
 interface Props extends MapCanvasProps {
   readonly apiKey: string;
@@ -37,10 +39,13 @@ export function GoogleMapCanvas({
   onSelect,
   onMapClick,
   className,
+  focus,
   apiKey,
   mapId,
   onUnavailable,
 }: Props) {
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
@@ -64,9 +69,7 @@ export function GoogleMapCanvas({
 
         mapRef.current = new google.maps.Map(containerRef.current, {
           center: LEBANON_CENTER,
-          zoom: MIN_ZOOM,
-          restriction: LEBANON_RESTRICTION,
-          minZoom: MIN_ZOOM,
+          zoom: 8,
           // Required for Advanced Markers. Inline `styles[]` was decommissioned in 2025, so the
           // map's visual design lives in the Cloud console against this ID.
           mapId,
@@ -108,6 +111,31 @@ export function GoogleMapCanvas({
           clickable: false,
           zIndex: 2,
         });
+
+        // Frame the country, then make that the floor.
+        //
+        // The zoom that fits Lebanon depends on the size of the window, so it is measured here
+        // rather than hardcoded. Locking minZoom to it means the user can zoom in as far as
+        // they like — down to a street — but never back out to a view full of countries the
+        // team does not work in.
+        // Order matters. Frame the country first, then read the zoom that produced — it
+        // depends on the window size, so it cannot be hardcoded — and only THEN lock the floor
+        // and switch the pan restriction on. Applying the restriction first breaks it: at the
+        // opening zoom the viewport is bigger than the box, Google cannot honour that, and the
+        // map opens on half the region instead.
+        const map = mapRef.current;
+        const wanted = focusRef.current;
+        if (map && wanted) {
+          map.setCenter({ lat: wanted.coordinate.latitude, lng: wanted.coordinate.longitude });
+          map.setZoom(wanted.zoom);
+        } else if (map) {
+          map.fitBounds(LEBANON_BOUNDS, 0);
+          google.maps.event.addListenerOnce(map, 'idle', () => {
+            const fitted = map.getZoom();
+            if (fitted == null) return;
+            map.setOptions({ minZoom: fitted, restriction: LEBANON_RESTRICTION });
+          });
+        }
 
         setReady(true);
       })
@@ -208,35 +236,9 @@ export function GoogleMapCanvas({
     });
   }, [ready, polyline, stops]);
 
-  // Fit the route when its shape changes, but leave the user free to pan and zoom afterwards.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map || stops.length === 0) return;
-
-    // Fewer than two DISTINCT points has no extent, and Google answers that by slamming to
-    // maximum zoom — one building filling the screen. Settings (the depot) resolve before the
-    // day's appointments, so without this it fires on every single load, not just empty days.
-    // The OpenStreetMap renderer already guards this; the guard was never ported here.
-    const distinct = new Set(
-      stops.map((s) => `${s.coordinate.latitude.toFixed(4)},${s.coordinate.longitude.toFixed(4)}`),
-    );
-    if (distinct.size < 2) {
-      map.fitBounds(LEBANON_RESTRICTION.latLngBounds, 24);
-      return;
-    }
-
-    const bounds = new google.maps.LatLngBounds();
-    for (const stop of stops) {
-      bounds.extend({ lat: stop.coordinate.latitude, lng: stop.coordinate.longitude });
-    }
-    map.fitBounds(bounds, 64);
-    // Matches the other renderer: several stops in one town should not zoom to street level and
-    // lose the sense of where in the country the day is happening.
-    const listener = google.maps.event.addListenerOnce(map, 'idle', () => {
-      if ((map.getZoom() ?? 0) > 12) map.setZoom(12);
-    });
-    return () => listener.remove();
-  }, [ready, stops.length]);
+  // Deliberately no per-day refit. Every route is inside Lebanon and Lebanon is always in
+  // frame, so refitting bought nothing and made the map lurch on each date change. The user's
+  // own pan and zoom now survive everything.
 
   // Two stops at one doorstep land on the same point and the upper one hides the lower — which
   // the brief's own example produces: Khalde on the way out and Khalde again on the way home.

@@ -26,6 +26,13 @@ export interface MapCanvasProps {
   readonly onSelect?: (id: string) => void;
   readonly onMapClick?: (coordinate: Coordinate) => void;
   readonly className?: string;
+  /**
+   * Open close-up on this point instead of framing the whole country.
+   *
+   * The schedule wants the country: you are reading a day's shape. Placing a single pin wants
+   * the opposite — a country-wide view makes precise placement impossible.
+   */
+  readonly focus?: { readonly coordinate: Coordinate; readonly zoom: number };
 }
 
 /** Google's polyline algorithm. Decoding here keeps the format detail out of the components. */

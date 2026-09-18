@@ -7,7 +7,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Button, Card, Field, Input, Spinner } from '@/components/ui/primitives';
 import { TimeInput } from '@/components/ui/TimeInput';
 import { api } from '@/lib/api/client';
-import { AreasSection } from './AreasSection';
+import { DepotPicker } from './DepotPicker';
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
@@ -50,36 +50,8 @@ export default function SettingsPage() {
               centre — the return-time estimate is only as good as this point.
             </p>
 
-            <div className="mt-4 space-y-4">
-              <Field label="Name">
-                <Input
-                  value={draft.depotLabel}
-                  onChange={(event) => patch({ depotLabel: event.target.value })}
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Latitude">
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={draft.depotLatitude}
-                    onChange={(event) => patch({ depotLatitude: Number(event.target.value) })}
-                  />
-                </Field>
-                <Field label="Longitude">
-                  <Input
-                    type="number"
-                    step="0.000001"
-                    value={draft.depotLongitude}
-                    onChange={(event) => patch({ depotLongitude: Number(event.target.value) })}
-                  />
-                </Field>
-              </div>
-              <p className="text-xs text-ink-muted">
-                To get these: open Google Maps, right-click the exact spot, and click the
-                coordinates to copy them.
-              </p>
+            <div className="mt-4">
+              <DepotPicker draft={draft} onChange={patch} />
             </div>
           </Card>
 
@@ -158,8 +130,6 @@ export default function SettingsPage() {
               </span>
             ) : null}
           </div>
-
-          <AreasSection />
         </>
       )}
     </PageShell>
