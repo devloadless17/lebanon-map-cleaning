@@ -37,10 +37,3 @@ export function useGeometry(date: string, enabled: boolean) {
   });
 }
 
-export function usePlanningAreas() {
-  return useQuery({
-    queryKey: ['planning-areas'],
-    queryFn: () => scheduleApi.planningAreas(),
-    staleTime: 10 * 60_000,
-  });
-}

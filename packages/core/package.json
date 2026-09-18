@@ -1,0 +1,37 @@
+{
+  "name": "@lebanon/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "demo:reset": "dotenv -e ../../.env -- tsx src/reset-demo.ts",
+    "db:generate": "prisma generate"
+  },
+  "dependencies": {
+    "@lebanon/contracts": "*",
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "7.10.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "typescript": "^5.9.3",
+    "vitest": "5.0.1",
+    "prisma": "7.10.0",
+    "tsx": "^4.20.6",
+    "dotenv-cli": "^10.0.0",
+    "dotenv": "^17.2.3"
+  }
+}

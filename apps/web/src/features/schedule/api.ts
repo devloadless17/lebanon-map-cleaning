@@ -34,13 +34,6 @@ export interface AppointmentRow {
   };
 }
 
-export interface PlanningAreaRow {
-  id: string;
-  name: string;
-  colorToken: string;
-  localities: Array<{ id: string; name: string }>;
-}
-
 export interface ResolvedLocation {
   latitude: number;
   longitude: number;
@@ -58,7 +51,6 @@ export const scheduleApi = {
   geometry: (date: string) => api.get<{ encodedPolyline: string | null }>(`/days/${date}/geometry`),
   preview: (date: string, body: PreviewRequest) =>
     api.post<PreviewResponse>(`/days/${date}/preview`, body),
-  planningAreas: () => api.get<PlanningAreaRow[]>('/planning-areas'),
   resolveLocation: (input: string) => api.post<ResolvedLocation>('/locations/resolve', { input }),
   reverseLocation: (latitude: number, longitude: number) =>
     api.post<ResolvedLocation>('/locations/reverse', { latitude, longitude }),

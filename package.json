@@ -10,19 +10,17 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run build --workspace @lebanon/contracts && concurrently -k -n contracts,api,web -c gray,cyan,magenta \"npm:dev:contracts\" \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "concurrently -k -n contracts,web -c gray,magenta \"npm:dev:contracts\" \"npm:dev:web\"",
     "build": "npm run build --workspace @lebanon/contracts && npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "db:migrate": "npm run db:migrate --workspace @lebanon/api",
-    "db:seed": "npm run db:seed --workspace @lebanon/api",
-    "db:studio": "npm run db:studio --workspace @lebanon/api",
     "dev:contracts": "npm run dev --workspace @lebanon/contracts",
-    "dev:api": "npm run dev --workspace @lebanon/api",
     "dev:web": "npm run dev --workspace @lebanon/web",
-    "check:google": "npm run check:google --workspace @lebanon/api",
-    "cache:clear": "npm run cache:clear --workspace @lebanon/api"
+    "db:migrate": "npm run db:migrate --workspace @lebanon/core",
+    "db:deploy": "npm run db:deploy --workspace @lebanon/core",
+    "db:seed": "npm run db:seed --workspace @lebanon/core",
+    "demo:reset": "npm run demo:reset --workspace @lebanon/core"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",
