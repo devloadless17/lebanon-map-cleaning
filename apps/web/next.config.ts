@@ -5,9 +5,6 @@ const config: NextConfig = {
   // @lebanon/core ships TypeScript source rather than a build step, so Next compiles it as part
   // of the app. That keeps one toolchain instead of a watch-and-rebuild loop in development.
   transpilePackages: ['@lebanon/core', '@lebanon/contracts'],
-  // Emits a self-contained server with only the files it actually needs, so the runtime image
-  // carries no node_modules tree and no build toolchain.
-  output: 'standalone',
 };
 
 export default config;
