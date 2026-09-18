@@ -17,7 +17,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
     "demo:reset": "dotenv -e ../../.env -- tsx src/reset-demo.ts",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@lebanon/contracts": "*",
